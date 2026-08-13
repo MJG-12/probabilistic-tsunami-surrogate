@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "probabilistic-tsunami-surrogate"
+version = "0.1.0"
+description = "A probabilistic surrogate for tsunami height and arrival time at a fixed Makran coastal station network."
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "scikit-learn",
+]
+
+[project.optional-dependencies]
+model = [
+    "torch",
+    "torchvision",
+]
+evaluation = [
+    "scipy",
+    "scoringrules",
+]
+report = [
+    "matplotlib",
+]
+test = [
+    "pytest",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
