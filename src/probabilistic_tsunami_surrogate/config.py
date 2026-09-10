@@ -12,6 +12,7 @@ class RunConfig:
     SPLIT_DIR: Path = Path("data/splits")
     RUN_DIR: Path = Path("artifacts/model")
     VALIDATION_DIR: Path = Path("artifacts/data-validation")
+    REFERENCE_STATS_DIR: Path = Path("data/stats")
     OVERWRITE_TARGETS: bool = False
     CHECK_STATION_FILES: bool = False
     MAX_ABSOLUTE_ELEVATION: float | None = None

@@ -102,17 +102,31 @@ def validation_nll(model, loader, device):
         predictions, targets = _predict_batch(model, batch, device)
         for task in ("hmax", "arrival"):
             target = targets[task]
-            observed = ~torch.isnan(target)
             head = predictions[task]
-            distribution = torch.distributions.StudentT(
-                head["nu"],
-                loc=head["mu"],
-                scale=head["sigma"],
+            location = head["mu"]
+            scale = head["sigma"].expand_as(target)
+            degrees_freedom = head["nu"].expand_as(target)
+            # Match the notebook: mask values and parameters before log_prob.
+            observed = (
+                torch.isfinite(target)
+                & torch.isfinite(location)
+                & torch.isfinite(scale)
+                & torch.isfinite(degrees_freedom)
+                & (scale > 1e-12)
+                & (degrees_freedom > 1.0)
             )
-            sums[task] += (-distribution.log_prob(target)[observed]).sum(
+            values = target[observed]
+            if values.numel() == 0:
+                continue
+            distribution = torch.distributions.StudentT(
+                degrees_freedom[observed],
+                loc=location[observed],
+                scale=scale[observed],
+            )
+            sums[task] += (-distribution.log_prob(values)).sum(
                 dtype=torch.float64
             )
-            counts[task] += observed.sum()
+            counts[task] += values.numel()
 
     output = {
         task: (sums[task] / counts[task]).item()
@@ -142,8 +156,7 @@ def train_model(
 ):
     """Trains the station-aware model and writes checkpoints and run arrays.
 
-    Model initialization and batch order are intentionally not seeded to retain
-    stochastic variation across repeated training runs.
+    Model initialization and batch order are not seeded here.
     """
     data_root = Path(data_root)
     split_dir = Path(split_dir)

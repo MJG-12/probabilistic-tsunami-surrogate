@@ -4,7 +4,6 @@ import json
 import numpy as np
 
 from probabilistic_tsunami_surrogate.config import RunConfig
-from probabilistic_tsunami_surrogate.data.preprocessing import discover_entries
 from probabilistic_tsunami_surrogate.data.validation import (
     summarize_targets,
     validate_dataset,
@@ -13,8 +12,8 @@ from probabilistic_tsunami_surrogate.plotting import plot_data_distributions
 
 
 def validate_data(config):
-    """Validates scenarios and writes data-quality artifacts."""
-    entries = discover_entries(config.DATA_ROOT)
+    """Checks the saved research catalogue and writes data-quality artifacts."""
+    entries = np.load(config.entries_path, allow_pickle=True)
     valid_entries, issues = validate_dataset(
         config.DATA_ROOT,
         entries,

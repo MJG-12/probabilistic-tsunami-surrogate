@@ -12,7 +12,8 @@ from probabilistic_tsunami_surrogate.config import (
 
 def make_train_test_split(entries, test_size=TEST_SIZE, random_state=RANDOM_STATE):
     """Creates one magnitude-stratified train/test split."""
-    labels = np.asarray([magnitude for magnitude, _ in entries])
+    # Preserve the notebook labels, including the unused cluster suffix.
+    labels = np.asarray([f"{magnitude}|C0" for magnitude, _ in entries])
     splitter = StratifiedShuffleSplit(
         n_splits=1,
         test_size=test_size,
@@ -28,7 +29,7 @@ def make_cross_validation_folds(
     random_state=RANDOM_STATE,
 ):
     """Creates magnitude-stratified folds inside the training set."""
-    labels = np.asarray([magnitude for magnitude, _ in entries])
+    labels = np.asarray([f"{magnitude}|C0" for magnitude, _ in entries])
     splitter = StratifiedKFold(
         n_splits=n_splits,
         shuffle=True,

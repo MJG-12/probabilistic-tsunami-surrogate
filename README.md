@@ -2,46 +2,57 @@
 
 A probabilistic neural surrogate for tsunami simulations in the Makran
 subduction zone. Given an initial surface-elevation field, bathymetry and
-scenario metadata, the model estimates maximum wave height and first-wave
-arrival time at a fixed network of 317 coastal stations.
+earthquake slip type, the model predicts maximum wave height and first-wave
+arrival time at 317 coastal stations.
 
-The accompanying [report](report.pdf) has been edited for presentation and
-clarity; the reported results are unchanged. The original simulation data and
-trained checkpoint cannot be redistributed, so this repository documents the
-research pipeline rather than providing a self-contained reproducible release.
-Tests use small synthetic fixtures.
+This repository contains the research code accompanying the [report](report.pdf).
+The code was extracted from research notebooks and reorganized into modules
+and scripts for readability. The original research was carried out in stages
+across those notebooks.
 
-## Repository structure
+The original simulation data and trained checkpoint are not available for
+redistribution.
+
+## Model
+
+A modified ResNet-18 combines global image features with local features sampled
+at station locations, station coordinates and slip embeddings. A shared decoder
+predicts Student-t distribution parameters for both tasks, providing point
+predictions and prediction intervals. The report describes the methodology,
+evaluation and limitations.
+
+## Code structure
 
 ```text
 src/probabilistic_tsunami_surrogate/
   config.py          paths and run settings
-  data/
-    cleaning.py      station parsing and target construction
-    dataset.py       PyTorch dataset
-    preprocessing.py scenario discovery and transformations
-    splits.py        train/test and cross-validation splits
-    validation.py    data checks and target summaries
-  evaluation.py      checkpoint prediction and evaluation
-  losses.py          multitask Student-t likelihood
-  metrics.py         deterministic and probabilistic metrics
+  data/              target construction, filtering, preprocessing and splits
   model.py           station-aware ResNet-18
-  plotting.py        dataset and evaluation figures
-  training.py        training loop
-scripts/             preprocessing, training and evaluation entry points
-tests/               unit tests
+  losses.py          multitask Student-t likelihood
+  training.py        training and validation
+  evaluation.py      checkpoint loading and prediction
+  metrics.py         deterministic and probabilistic evaluation
+  plotting.py        data and evaluation figures
+scripts/             entry points for individual research stages
+tests/               checks using synthetic data
 ```
 
-## Environment
+| Script | Purpose |
+| --- | --- |
+| `convert_text_arrays.py` | Convert simulation text arrays to NumPy format |
+| `build_scenario_targets.py` | Extract wave heights and arrival times from station outputs |
+| `build_entries.py` | Filter scenarios and remove duplicates |
+| `validate_data.py` | Check data quality and summarize target distributions |
+| `build_splits.py` | Create magnitude-stratified train/test and validation splits |
+| `train_model.py` | Train the surrogate |
+| `evaluate_model.py` | Evaluate a checkpoint on the test set |
+| `build_report_assets.py` | Generate evaluation figures and summaries |
+| `evaluate_reference.py` | Calculate reference Student-t CRPS scores |
 
-Python 3.10 or newer is required.
+## Setup
 
-This setup is provided for running the synthetic tests and for researchers who
-have access to the original data. Create the environment on the workstation or
-hosted runtime where the code will be executed. A GPU environment must have a
-CUDA-compatible build of PyTorch and torchvision; hosted GPU runtimes such as
-Google Colab commonly provide these already. The project and all of its
-optional dependencies can then be installed with:
+Requires Python 3.10 or newer. To install the project and its optional
+dependencies:
 
 ```bash
 python -m venv .venv
@@ -50,27 +61,14 @@ python -m pip install -e ".[model,evaluation,report,test]"
 pytest -q
 ```
 
-In Colab, the equivalent package installation can be run with `%pip` from the
-repository directory. These commands install the software only; they do not
-provide the simulation data or a trained checkpoint.
+The tests use synthetic data. Training and evaluation require the original
+simulation data. The model was trained on a GPU in Google Colab; full-resolution
+training is intended for a CUDA-capable GPU. CPU execution is supported for
+small checks.
 
-## Compute
+## Data layout
 
-For computational provenance, the full-resolution model was originally trained
-using a GPU in Google Colab. For a rerun with the source data, a CUDA-capable
-GPU is strongly recommended because CPU execution is prohibitively slow at the
-working grid size. Training and evaluation select CUDA automatically when
-`torch.cuda.is_available()` is true, while retaining a CPU fallback for small
-checks. No code changes are needed when moving to a CUDA-enabled machine; only
-the appropriate PyTorch installation and the project dependencies are required
-there.
-
-## Data
-
-The simulation dataset belongs to the originating research group and is not
-available for redistribution. It is not included here and is not intended for
-public release. The layout below documents the structure expected by the code;
-it is not a description of a downloadable dataset:
+The code expects the following directory structure:
 
 ```text
 data/raw/
@@ -85,34 +83,19 @@ data/raw/
       outputs/sta_0001
       ...
     M2/
-  9.0/
+  9/
 ```
 
-Paths and run settings are defined in `RunConfig` in
-`src/probabilistic_tsunami_surrogate/config.py`.
-
-## Pipeline reference
-
-The following commands document the research workflow. They require access to
-the original data in the expected directory structure and are not a publicly
-reproducible example.
-
-Prepare and validate the data:
-
-```bash
-python scripts/convert_text_arrays.py       # if the arrays are stored as text
-python scripts/build_scenario_targets.py    # if targets must be rebuilt
-python scripts/build_entries.py
-python scripts/validate_data.py
-python scripts/build_splits.py
-```
-
-Train and evaluate the model:
+Paths and run settings are defined in
+[config.py](src/probabilistic_tsunami_surrogate/config.py).
+Run individual stages from the repository root, for example:
 
 ```bash
 python scripts/train_model.py
 python scripts/evaluate_model.py
-python scripts/build_report_assets.py
 ```
 
-The trained checkpoint is also not distributed with the repository.
+Reference CRPS evaluation also requires the saved target statistics in
+`REFERENCE_STATS_DIR` (default `data/stats`): `hmax_mean_asinh.npy`,
+`hmax_std_asinh.npy`, `arrival_time_mean_log.npy` and
+`arrival_time_std_log.npy`.

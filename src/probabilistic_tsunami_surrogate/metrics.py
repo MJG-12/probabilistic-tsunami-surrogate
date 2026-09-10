@@ -108,14 +108,6 @@ def _task_metrics(data, mean, target_scale, task):
         + np.maximum(target_physical - upper_95, 0)
     )
     pit = student_t.cdf(target, nu, loc=location, scale=scale)
-    has_reference = nu > 2
-    reference_scale = np.sqrt((nu[has_reference] - 2) / nu[has_reference])
-    reference_crps = crps_t(
-        target[has_reference],
-        nu[has_reference],
-        np.zeros_like(target[has_reference]),
-        reference_scale,
-    )
     correlation = spearmanr(np.abs(residual), width_95).statistic
 
     output = {
@@ -125,9 +117,6 @@ def _task_metrics(data, mean, target_scale, task):
         "nll_z": float(np.mean(nll_z)),
         "nll": float(np.mean(nll_physical)),
         "crps_z": float(np.mean(crps)),
-        "reference_crps_z": (
-            float(np.mean(reference_crps)) if reference_crps.size else float("nan")
-        ),
         "picp_50": float(
             np.mean((target_physical >= lower_50) & (target_physical <= upper_50))
         ),

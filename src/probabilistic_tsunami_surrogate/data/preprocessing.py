@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import numpy as np
+import xxhash
 from sklearn.preprocessing import RobustScaler, StandardScaler
 
 from probabilistic_tsunami_surrogate.config import (
@@ -48,7 +49,7 @@ def fit_preprocessing_stats(
     indices,
     entries=None,
     eta_sample_ratio=0.1,
-    random_state=0,
+    rng=np.random.default_rng(0),
     arrival_file="arrival_times.npy",
 ):
     """Fits input and target scalers using training scenarios only."""
@@ -60,7 +61,6 @@ def fit_preprocessing_stats(
         entries = np.load(root / "entries.npy", allow_pickle=True)
     selected = np.asarray(entries, dtype=object)[np.asarray(indices, dtype=int)]
     keep = station_keep_mask()
-    rng = np.random.default_rng(random_state)
 
     eta_samples = []
     for magnitude, scenario_id in selected:
@@ -119,6 +119,65 @@ def discover_entries(root):
             if scenario_dir.is_dir():
                 entries.append((magnitude_dir.name, scenario_dir.name))
     return sorted(entries, key=lambda entry: (float(entry[0]), entry[1]))
+
+
+def prepare_entries(root, max_absolute_elevation=None):
+    """Filters invalid scenarios and removes duplicate simulations.
+
+    Target filtering uses hmax. Arrival issues are reported but do not
+    independently exclude scenarios. Duplicate keys use
+    stride-4 elevation rounded through float16 back to float32 and all 322
+    hmax targets as float32, before station exclusion.
+    """
+    root = Path(root)
+    accepted = []
+    fingerprints = {}
+    # The notebook traversed directory names lexicographically.
+    for magnitude, scenario_id in sorted(discover_entries(root)):
+        entry = (magnitude, scenario_id)
+        directory = root / magnitude / scenario_id
+
+        try:
+            elevation = np.load(
+                directory / "external_files" / "eta.npy", mmap_mode="r"
+            )[::4, ::4]
+            if np.isnan(elevation).all():
+                raise ValueError("all-NaN elevation")
+            if (
+                max_absolute_elevation is not None
+                and np.max(np.abs(elevation)) > max_absolute_elevation
+            ):
+                raise ValueError("elevation exceeds the configured range")
+        except (OSError, ValueError, IndexError) as error:
+            print(f"Elevation issue {magnitude}/{scenario_id}: {error}")
+            continue
+
+        hmax = None
+        for filename, task in (
+            ("hmax.npy", "hmax"),
+            ("arrival_times.npy", "arrival"),
+        ):
+            try:
+                values = np.load(directory / filename)
+                if np.isnan(values).all():
+                    raise ValueError(f"all-NaN {task}")
+                if task == "hmax":
+                    hmax = values.astype(np.float32)
+            except (OSError, ValueError) as error:
+                print(f"Target issue {magnitude}/{scenario_id}: {error}")
+        if hmax is None:
+            continue
+
+        elevation = elevation.ravel().astype(np.float16).astype(np.float32)
+        fingerprint = xxhash.xxh64(elevation.tobytes() + hmax.tobytes()).intdigest()
+        if fingerprint in fingerprints:
+            survivor = fingerprints[fingerprint]
+            print(f"[HASH] {entry} is duplicate of {survivor}")
+            continue
+        fingerprints[fingerprint] = entry
+        accepted.append(entry)
+
+    return accepted
 
 
 def convert_txt_to_npy(root, dtype=np.float32):
