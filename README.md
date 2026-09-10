@@ -5,13 +5,11 @@ subduction zone. Given an initial surface-elevation field, bathymetry and
 scenario metadata, the model estimates maximum wave height and first-wave
 arrival time at a fixed network of 317 coastal stations.
 
-The repository documents the data-processing, training and evaluation code.
-The project report is being corrected separately and is not included in this
-initial code release. This is not a self-contained reproducible release:
-running the pipeline end to end requires the original research dataset, which
-cannot be redistributed. The source can be inspected without it, and the tests
-construct small synthetic fixtures, but the study cannot be reproduced from
-the public repository alone.
+The accompanying [report](report.pdf) has been edited for presentation and
+clarity; the reported results are unchanged. The original simulation data and
+trained checkpoint cannot be redistributed, so this repository documents the
+research pipeline rather than providing a self-contained reproducible release.
+Tests use small synthetic fixtures.
 
 ## Repository structure
 
